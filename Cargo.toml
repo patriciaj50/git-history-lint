@@ -1,0 +1,8 @@
+[package]
+name = "git-history-lint"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Lints the output of `git log` for commit message style problems"
+
+[dependencies]
