@@ -1,6 +1,5 @@
+use crate::config::Config;
 use crate::parser::{Commit, Line};
-
-const MAX_LINE_LEN: usize = 72;
 
 #[derive(Debug, Clone)]
 pub struct Finding {
@@ -10,7 +9,7 @@ pub struct Finding {
     pub hash: String,
 }
 
-type CheckFn = fn(&Commit) -> Vec<(usize, String)>;
+type CheckFn = fn(&Commit, &Config) -> Vec<(usize, String)>;
 
 struct Rule {
     id: &'static str,
@@ -28,10 +27,19 @@ const RULES: &[Rule] = &[
     Rule { id: "body-line-too-long", check: check_body_line_too_long },
 ];
 
-pub fn lint_commit(commit: &Commit) -> Vec<Finding> {
+/// All rule ids the linter knows about, for validating a config's
+/// `disable` entries against typos.
+pub fn rule_ids() -> impl Iterator<Item = &'static str> {
+    RULES.iter().map(|r| r.id)
+}
+
+pub fn lint_commit(commit: &Commit, config: &Config) -> Vec<Finding> {
     let mut findings = Vec::new();
     for rule in RULES {
-        for (line, message) in (rule.check)(commit) {
+        if config.disabled_rules.contains(rule.id) {
+            continue;
+        }
+        for (line, message) in (rule.check)(commit, config) {
             findings.push(Finding {
                 line,
                 rule: rule.id,
@@ -44,7 +52,7 @@ pub fn lint_commit(commit: &Commit) -> Vec<Finding> {
     findings
 }
 
-fn check_empty_subject(commit: &Commit) -> Vec<(usize, String)> {
+fn check_empty_subject(commit: &Commit, _config: &Config) -> Vec<(usize, String)> {
     if commit.subject.is_none() {
         vec![(commit.header_line, "commit has no message".to_string())]
     } else {
@@ -52,17 +60,17 @@ fn check_empty_subject(commit: &Commit) -> Vec<(usize, String)> {
     }
 }
 
-fn check_subject_too_long(commit: &Commit) -> Vec<(usize, String)> {
+fn check_subject_too_long(commit: &Commit, config: &Config) -> Vec<(usize, String)> {
     match &commit.subject {
-        Some(s) if s.text.chars().count() > MAX_LINE_LEN => {
+        Some(s) if s.text.chars().count() > config.max_line_len => {
             let len = s.text.chars().count();
-            vec![(s.number, format!("subject line is {} characters, limit is {}", len, MAX_LINE_LEN))]
+            vec![(s.number, format!("subject line is {} characters, limit is {}", len, config.max_line_len))]
         }
         _ => Vec::new(),
     }
 }
 
-fn check_subject_trailing_period(commit: &Commit) -> Vec<(usize, String)> {
+fn check_subject_trailing_period(commit: &Commit, _config: &Config) -> Vec<(usize, String)> {
     match &commit.subject {
         Some(s) if s.text.trim_end().ends_with('.') => {
             vec![(s.number, "subject line ends with a period".to_string())]
@@ -71,7 +79,7 @@ fn check_subject_trailing_period(commit: &Commit) -> Vec<(usize, String)> {
     }
 }
 
-fn check_subject_capitalized(commit: &Commit) -> Vec<(usize, String)> {
+fn check_subject_capitalized(commit: &Commit, _config: &Config) -> Vec<(usize, String)> {
     match &commit.subject {
         Some(s) => match s.text.chars().next() {
             Some(c) if c.is_lowercase() => {
@@ -83,7 +91,7 @@ fn check_subject_capitalized(commit: &Commit) -> Vec<(usize, String)> {
     }
 }
 
-fn check_missing_blank_line(commit: &Commit) -> Vec<(usize, String)> {
+fn check_missing_blank_line(commit: &Commit, _config: &Config) -> Vec<(usize, String)> {
     match commit.body.first() {
         Some(l) if !l.text.is_empty() => {
             vec![(l.number, "missing blank line between subject and body".to_string())]
@@ -92,7 +100,7 @@ fn check_missing_blank_line(commit: &Commit) -> Vec<(usize, String)> {
     }
 }
 
-fn check_trailing_whitespace(commit: &Commit) -> Vec<(usize, String)> {
+fn check_trailing_whitespace(commit: &Commit, _config: &Config) -> Vec<(usize, String)> {
     let mut findings = Vec::new();
     let lines: Vec<&Line> = commit.subject.iter().chain(commit.body.iter()).collect();
     for l in lines {
@@ -103,14 +111,14 @@ fn check_trailing_whitespace(commit: &Commit) -> Vec<(usize, String)> {
     findings
 }
 
-fn check_body_line_too_long(commit: &Commit) -> Vec<(usize, String)> {
+fn check_body_line_too_long(commit: &Commit, config: &Config) -> Vec<(usize, String)> {
     commit
         .body
         .iter()
-        .filter(|l| l.text.chars().count() > MAX_LINE_LEN)
+        .filter(|l| l.text.chars().count() > config.max_line_len)
         .map(|l| {
             let len = l.text.chars().count();
-            (l.number, format!("body line is {} characters, limit is {}", len, MAX_LINE_LEN))
+            (l.number, format!("body line is {} characters, limit is {}", len, config.max_line_len))
         })
         .collect()
 }

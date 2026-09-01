@@ -1,3 +1,4 @@
+use git_history_lint::config::Config;
 use git_history_lint::{lint, parser};
 
 struct Case {
@@ -7,9 +8,10 @@ struct Case {
 }
 
 fn run(input: &str) -> Vec<(&'static str, usize)> {
+    let config = Config::default();
     let mut findings = Vec::new();
     for commit in parser::parse(input) {
-        for f in lint::lint_commit(&commit) {
+        for f in lint::lint_commit(&commit, &config) {
             findings.push((f.rule, f.line));
         }
     }
@@ -183,4 +185,32 @@ fn table_driven_rule_checks() {
         let actual = run(&case.input);
         assert_eq!(actual, case.expected, "case failed: {}", case.name);
     }
+}
+
+#[test]
+fn disabled_rule_produces_no_finding_for_it() {
+    let input = header_block("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "fix the bug");
+    let mut config = Config::default();
+    config.disabled_rules.insert("subject-not-capitalized".to_string());
+
+    let commit = parser::parse(&input).into_iter().next().unwrap();
+    let findings: Vec<&'static str> = lint::lint_commit(&commit, &config)
+        .into_iter()
+        .map(|f| f.rule)
+        .collect();
+
+    assert!(!findings.contains(&"subject-not-capitalized"));
+}
+
+#[test]
+fn custom_max_line_len_shortens_the_allowed_subject() {
+    let input = header_block("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "Short subject line");
+    let mut config = Config::default();
+    config.max_line_len = 10;
+
+    let commit = parser::parse(&input).into_iter().next().unwrap();
+    let findings = lint::lint_commit(&commit, &config);
+
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].rule, "subject-too-long");
 }

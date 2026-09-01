@@ -3,7 +3,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::process::ExitCode;
 
-use git_history_lint::{lint, parser};
+use git_history_lint::{config, lint, parser};
 
 fn main() -> ExitCode {
     let mut args = env::args().skip(1);
@@ -15,6 +15,22 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+
+    let config = match config::load() {
+        Ok(config) => config,
+        Err(err) => {
+            eprintln!("git-history-lint: {}", err);
+            return ExitCode::from(2);
+        }
+    };
+    if let Some(bad) = config
+        .disabled_rules
+        .iter()
+        .find(|id| !lint::rule_ids().any(|known| known == id.as_str()))
+    {
+        eprintln!("git-history-lint: unknown rule in config: {}", bad);
+        return ExitCode::from(2);
+    }
 
     let input = match read_input(&path) {
         Ok(text) => text,
@@ -28,7 +44,7 @@ fn main() -> ExitCode {
     let mut found_any = false;
 
     for commit in &commits {
-        for finding in lint::lint_commit(commit) {
+        for finding in lint::lint_commit(commit, &config) {
             found_any = true;
             let short_hash = &finding.hash[..finding.hash.len().min(7)];
             println!(

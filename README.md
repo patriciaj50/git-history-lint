@@ -46,12 +46,30 @@ Exit status is 1 if anything was flagged, 0 if the history is clean, and
 ## What it checks
 
 - `empty-subject` — a commit with no message
-- `subject-too-long` — subject line over 72 characters
+- `subject-too-long` — subject line over the length limit (72 by default)
 - `subject-trailing-period` — subject ends with `.`
 - `subject-not-capitalized` — subject starts with a lowercase letter
 - `missing-blank-line` — body starts right after the subject, no gap
 - `trailing-whitespace` — a message line has trailing spaces or tabs
-- `body-line-too-long` — a body line over 72 characters
+- `body-line-too-long` — a body line over the length limit (72 by default)
+
+Any rule can be disabled and the length limit adjusted, see Config below.
+
+## Config
+
+Drop a `.git-history-lint.conf` file in the directory you run the linter
+from to change the line length limit or turn off individual rules:
+
+```
+max-line-len = 100
+disable = subject-trailing-period
+disable = trailing-whitespace
+```
+
+Blank lines and `#` comments are ignored. `disable` can appear more than
+once. An unknown key, a bad `max-line-len` value, or an unrecognized rule
+id in `disable` is an error, not a silent no-op. No config file means the
+defaults apply: a 72 character limit and every rule enabled.
 
 ## Limitations
 
