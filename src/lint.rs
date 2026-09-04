@@ -22,6 +22,7 @@ const RULES: &[Rule] = &[
     Rule { id: "subject-too-long", check: check_subject_too_long },
     Rule { id: "subject-trailing-period", check: check_subject_trailing_period },
     Rule { id: "subject-not-capitalized", check: check_subject_capitalized },
+    Rule { id: "subject-not-imperative", check: check_subject_imperative_mood },
     Rule { id: "missing-blank-line", check: check_missing_blank_line },
     Rule { id: "trailing-whitespace", check: check_trailing_whitespace },
     Rule { id: "body-line-too-long", check: check_body_line_too_long },
@@ -87,6 +88,37 @@ fn check_subject_capitalized(commit: &Commit, _config: &Config) -> Vec<(usize, S
             }
             _ => Vec::new(),
         },
+        None => Vec::new(),
+    }
+}
+
+// Catching every non-imperative subject would need real grammar analysis,
+// so this just flags the past-tense and gerund forms of the verbs people
+// actually reach for in commit subjects ("Fixed the bug" instead of "Fix
+// the bug"). It only looks at the first word, so it won't catch every case
+// and won't touch subjects that already read as commands.
+const NON_IMPERATIVE_FIRST_WORDS: &[&str] = &[
+    "Fixed", "Added", "Changed", "Removed", "Updated", "Deleted", "Created",
+    "Implemented", "Refactored", "Improved", "Renamed", "Merged", "Reverted",
+    "Bumped", "Cleaned", "Moved", "Replaced",
+    "Fixing", "Adding", "Changing", "Removing", "Updating", "Deleting",
+    "Creating", "Implementing", "Refactoring", "Improving", "Renaming",
+    "Merging", "Reverting", "Bumping", "Cleaning", "Moving", "Replacing",
+];
+
+fn check_subject_imperative_mood(commit: &Commit, _config: &Config) -> Vec<(usize, String)> {
+    match &commit.subject {
+        Some(s) => {
+            let first_word = s.text.split_whitespace().next().unwrap_or("");
+            if NON_IMPERATIVE_FIRST_WORDS.contains(&first_word) {
+                vec![(
+                    s.number,
+                    format!("subject line should use imperative mood, not \"{}\"", first_word),
+                )]
+            } else {
+                Vec::new()
+            }
+        }
         None => Vec::new(),
     }
 }

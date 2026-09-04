@@ -62,6 +62,26 @@ fn cases() -> Vec<Case> {
             expected: vec![],
         },
         Case {
+            name: "subject starting with a past-tense verb is flagged",
+            input: header_block("1010101010101010101010101010101010101010", "Fixed the login bug"),
+            expected: vec![("subject-not-imperative", 5)],
+        },
+        Case {
+            name: "subject starting with a gerund is flagged",
+            input: header_block("2020202020202020202020202020202020202020", "Adding retry logic"),
+            expected: vec![("subject-not-imperative", 5)],
+        },
+        Case {
+            name: "subject already in imperative mood is not flagged",
+            input: header_block("3030303030303030303030303030303030303030", "Fix the login bug"),
+            expected: vec![],
+        },
+        Case {
+            name: "past tense word later in the subject is not flagged",
+            input: header_block("4040404040404040404040404040404040404040", "Handle the case where auth failed"),
+            expected: vec![],
+        },
+        Case {
             name: "unicode subject within the character limit is not flagged by byte length",
             // 40 chars, 80 bytes: would trip a byte-length check but not a char-count one.
             input: header_block("ffffffffffffffffffffffffffffffffffffffff", &"\u{c9}".repeat(40)),

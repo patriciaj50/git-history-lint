@@ -49,6 +49,8 @@ Exit status is 1 if anything was flagged, 0 if the history is clean, and
 - `subject-too-long` — subject line over the length limit (72 by default)
 - `subject-trailing-period` — subject ends with `.`
 - `subject-not-capitalized` — subject starts with a lowercase letter
+- `subject-not-imperative` — subject starts with a past-tense or gerund
+  verb ("Fixed", "Adding") instead of an imperative one ("Fix", "Add")
 - `missing-blank-line` — body starts right after the subject, no gap
 - `trailing-whitespace` — a message line has trailing spaces or tabs
 - `body-line-too-long` — a body line over the length limit (72 by default)
