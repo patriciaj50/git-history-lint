@@ -38,7 +38,12 @@ Output looks like:
 history.txt:14: subject line should start with a capital letter [subject-not-capitalized] (a1b2c3d)
 history.txt:41: missing blank line between subject and body [missing-blank-line] (4f9e21a)
 history.txt:58: subject line is 91 characters, limit is 72 [subject-too-long] (7cddb02)
+3 findings total: subject-too-long (1), subject-not-capitalized (1), missing-blank-line (1)
 ```
+
+The summary line is only printed when something was flagged, and tallies
+findings by rule in the order listed under "What it checks", not the
+order they appeared in the log.
 
 Exit status is 1 if anything was flagged, 0 if the history is clean, and
 2 if the input couldn't be read at all.

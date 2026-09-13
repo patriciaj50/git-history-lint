@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{self, Read};
@@ -41,11 +42,11 @@ fn main() -> ExitCode {
     };
 
     let commits = parser::parse(&input);
-    let mut found_any = false;
+    let mut rule_counts: HashMap<&'static str, usize> = HashMap::new();
 
     for commit in &commits {
         for finding in lint::lint_commit(commit, &config) {
-            found_any = true;
+            *rule_counts.entry(finding.rule).or_insert(0) += 1;
             let short_hash = &finding.hash[..finding.hash.len().min(7)];
             println!(
                 "{}:{}: {} [{}] ({})",
@@ -54,11 +55,27 @@ fn main() -> ExitCode {
         }
     }
 
-    if found_any {
-        ExitCode::from(1)
-    } else {
+    if rule_counts.is_empty() {
         ExitCode::SUCCESS
+    } else {
+        println!("{}", summary_line(&rule_counts));
+        ExitCode::from(1)
     }
+}
+
+/// One line tallying findings per rule, in the linter's fixed rule order
+/// so the breakdown reads the same across runs regardless of hash order.
+fn summary_line(rule_counts: &HashMap<&'static str, usize>) -> String {
+    let total: usize = rule_counts.values().sum();
+    let breakdown: Vec<String> = lint::rule_ids()
+        .filter_map(|id| rule_counts.get(id).map(|n| format!("{} ({})", id, n)))
+        .collect();
+    format!(
+        "{} finding{} total: {}",
+        total,
+        if total == 1 { "" } else { "s" },
+        breakdown.join(", ")
+    )
 }
 
 fn read_input(path: &str) -> io::Result<String> {
