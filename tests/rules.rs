@@ -1,4 +1,5 @@
 use git_history_lint::config::Config;
+use git_history_lint::parser::Format;
 use git_history_lint::{lint, parser};
 
 struct Case {
@@ -220,6 +221,41 @@ fn disabled_rule_produces_no_finding_for_it() {
         .collect();
 
     assert!(!findings.contains(&"subject-not-capitalized"));
+}
+
+#[test]
+fn oneline_format_splits_hash_and_subject_on_the_first_space() {
+    let input = "a1b2c3d Fix the bug\ne4f5g6h Add feature X";
+    let commits = parser::parse_with_format(input, Format::Oneline);
+
+    assert_eq!(commits.len(), 2);
+    assert_eq!(commits[0].hash, "a1b2c3d");
+    assert_eq!(commits[0].header_line, 1);
+    assert_eq!(commits[0].subject.as_ref().unwrap().text, "Fix the bug");
+    assert_eq!(commits[0].subject.as_ref().unwrap().number, 1);
+    assert_eq!(commits[1].hash, "e4f5g6h");
+    assert_eq!(commits[1].header_line, 2);
+}
+
+#[test]
+fn oneline_format_with_no_space_has_no_subject() {
+    let commits = parser::parse_with_format("a1b2c3d", Format::Oneline);
+
+    assert_eq!(commits.len(), 1);
+    assert!(commits[0].subject.is_none());
+}
+
+#[test]
+fn oneline_format_findings_land_on_the_commit_line() {
+    let config = Config::default();
+    let input = "a1b2c3d fix the bug\ne4f5g6h Add a feature";
+    let findings: Vec<(&'static str, usize)> = parser::parse_with_format(input, Format::Oneline)
+        .iter()
+        .flat_map(|c| lint::lint_commit(c, &config))
+        .map(|f| (f.rule, f.line))
+        .collect();
+
+    assert_eq!(findings, vec![("subject-not-capitalized", 1)]);
 }
 
 #[test]

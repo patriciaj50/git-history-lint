@@ -6,13 +6,38 @@ use std::process::ExitCode;
 
 use git_history_lint::{config, lint, parser};
 
+fn usage() {
+    eprintln!("usage: git-history-lint [--format=medium|oneline] <path>|-");
+    eprintln!("  pipe git log output in, e.g.: git log | git-history-lint -");
+    eprintln!("  use --format=oneline to read `git log --oneline` output");
+}
+
 fn main() -> ExitCode {
-    let mut args = env::args().skip(1);
-    let path = match args.next() {
+    let mut format = parser::Format::Medium;
+    let mut path: Option<String> = None;
+
+    for arg in env::args().skip(1) {
+        if let Some(value) = arg.strip_prefix("--format=") {
+            format = match value {
+                "medium" => parser::Format::Medium,
+                "oneline" => parser::Format::Oneline,
+                other => {
+                    eprintln!("git-history-lint: unknown format {:?}, expected \"medium\" or \"oneline\"", other);
+                    return ExitCode::from(2);
+                }
+            };
+        } else if path.is_none() {
+            path = Some(arg);
+        } else {
+            usage();
+            return ExitCode::from(2);
+        }
+    }
+
+    let path = match path {
         Some(p) => p,
         None => {
-            eprintln!("usage: git-history-lint <path>|-");
-            eprintln!("  pipe git log output in, e.g.: git log | git-history-lint -");
+            usage();
             return ExitCode::from(2);
         }
     };
@@ -41,7 +66,7 @@ fn main() -> ExitCode {
         }
     };
 
-    let commits = parser::parse(&input);
+    let commits = parser::parse_with_format(&input, format);
     let mut rule_counts: HashMap<&'static str, usize> = HashMap::new();
 
     for commit in &commits {

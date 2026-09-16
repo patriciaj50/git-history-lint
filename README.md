@@ -32,6 +32,16 @@ git log > history.txt
 git-history-lint history.txt
 ```
 
+By default it expects the layout plain `git log` prints (also what you get
+from `--format=short/full/fuller`, which only add or drop header lines).
+For `git log --oneline`, pass `--format=oneline`:
+
+```sh
+git log --oneline | git-history-lint --format=oneline -
+```
+
+`--format` can go before or after the path argument.
+
 Output looks like:
 
 ```
@@ -80,10 +90,14 @@ defaults apply: a 72 character limit and every rule enabled.
 
 ## Limitations
 
-Only the default `git log` format is understood right now. `git log -p`
-and `--stat` output will parse (their extra lines are just skipped),
-but diffs and stat summaries aren't inspected. `--format` with a custom
-pretty-print string isn't supported yet.
+`git log -p` and `--stat` output will parse (their extra lines are just
+skipped), but diffs and stat summaries aren't inspected.
+
+`--format=oneline` is the only alternate layout supported. Since it has
+no message body, the body-only rules (`missing-blank-line`,
+`body-line-too-long`) never fire on it. Custom `--pretty=format:` strings
+aren't supported: there's no way to know their layout in general, so the
+parser only understands the handful of named formats above.
 
 ## Building
 

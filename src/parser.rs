@@ -1,7 +1,7 @@
-//! Parses the plain-text output of `git log` (the default format, not
-//! `-p` or `--stat`) into individual commits, keeping track of which
-//! source line each piece of the message came from. That's what lets the
-//! linter point back at an exact line instead of just naming a commit.
+//! Parses the plain-text output of `git log` (not `-p` or `--stat`) into
+//! individual commits, keeping track of which source line each piece of
+//! the message came from. That's what lets the linter point back at an
+//! exact line instead of just naming a commit.
 
 #[derive(Debug, Clone)]
 pub struct Line {
@@ -17,10 +17,39 @@ pub struct Commit {
     pub body: Vec<Line>,
 }
 
-/// Parses `input` into a list of commits. Anything before the first
-/// `commit ` line is ignored, so callers can feed in a log with a
-/// leading banner or pager artifacts without pre-cleaning it.
+/// Which `git log` layout the input is in. Formats that already put each
+/// commit's message on its own blank-line-terminated, four-space-indented
+/// block (`medium`, `short`, `full`, `fuller`) all parse the same way and
+/// don't need a variant here; only layouts with a genuinely different
+/// shape do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Format {
+    /// `commit <hash>` line, header lines, a blank line, then the
+    /// four-space-indented message. This is what plain `git log` prints,
+    /// and also `--format=short/full/fuller`.
+    Medium,
+    /// `git log --oneline`: one commit per line, `<hash> <subject>`, no
+    /// body and no separate header block.
+    Oneline,
+}
+
+/// Parses `input` into a list of commits, assuming the default `git log`
+/// layout. Use `parse_with_format` for other formats.
 pub fn parse(input: &str) -> Vec<Commit> {
+    parse_with_format(input, Format::Medium)
+}
+
+pub fn parse_with_format(input: &str, format: Format) -> Vec<Commit> {
+    match format {
+        Format::Medium => parse_medium(input),
+        Format::Oneline => parse_oneline(input),
+    }
+}
+
+/// Anything before the first `commit ` line is ignored, so callers can
+/// feed in a log with a leading banner or pager artifacts without
+/// pre-cleaning it.
+fn parse_medium(input: &str) -> Vec<Commit> {
     let lines: Vec<&str> = input.lines().collect();
     let mut commits = Vec::new();
     let mut i = 0;
@@ -73,6 +102,37 @@ pub fn parse(input: &str) -> Vec<Commit> {
         let body: Vec<Line> = iter.collect();
 
         commits.push(Commit { hash, header_line, subject, body });
+    }
+
+    commits
+}
+
+/// Each non-empty line is one commit: the hash, a single space, then the
+/// subject. A line with no space (or nothing after it) is a commit with
+/// an empty message, matching how the medium parser treats an all-blank
+/// message.
+fn parse_oneline(input: &str) -> Vec<Commit> {
+    let mut commits = Vec::new();
+
+    for (i, raw) in input.lines().enumerate() {
+        if raw.is_empty() {
+            continue;
+        }
+        let line_number = i + 1;
+        let (hash, rest) = match raw.split_once(' ') {
+            Some((hash, rest)) => (hash, Some(rest)),
+            None => (raw, None),
+        };
+        let subject = match rest {
+            Some(text) if !text.is_empty() => Some(Line { number: line_number, text: text.to_string() }),
+            _ => None,
+        };
+        commits.push(Commit {
+            hash: hash.to_string(),
+            header_line: line_number,
+            subject,
+            body: Vec::new(),
+        });
     }
 
     commits
