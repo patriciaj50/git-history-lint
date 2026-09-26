@@ -99,6 +99,41 @@ no message body, the body-only rules (`missing-blank-line`,
 aren't supported: there's no way to know their layout in general, so the
 parser only understands the handful of named formats above.
 
+## Pre-push hook
+
+Reject a push that would introduce a bad commit message by wiring the
+linter into `.git/hooks/pre-push`. Git feeds this hook one line per ref
+on stdin (`<local ref> <local sha1> <remote ref> <remote sha1>`), so the
+hook can restrict linting to just the commits about to leave the
+machine instead of the whole history:
+
+```sh
+#!/bin/sh
+# .git/hooks/pre-push
+
+zero="0000000000000000000000000000000000000000"
+
+while read local_ref local_sha remote_ref remote_sha; do
+    if [ "$local_sha" = "$zero" ]; then
+        continue # a branch delete, nothing to lint
+    fi
+    if [ "$remote_sha" = "$zero" ]; then
+        range="$local_sha" # new branch, lint its whole history
+    else
+        range="$remote_sha..$local_sha"
+    fi
+    if ! git log "$range" | git-history-lint -; then
+        echo "pre-push: fix the commit message issues above, or use --no-verify" >&2
+        exit 1
+    fi
+done
+```
+
+Make it executable with `chmod +x .git/hooks/pre-push`, and make sure
+`git-history-lint` itself is on `PATH` (`cargo install --path .` puts it
+in `~/.cargo/bin`). Hooks aren't committed to the repository, so anyone
+who wants this needs to add it to their own `.git/hooks/`.
+
 ## Building
 
 ```sh
